@@ -1,0 +1,79 @@
+name: grade
+# Task-specific v1 oracle: grades draft-output.md fences from ONE worker run
+# against the options1 (maybe_ice_cream) test table, machine-executed.
+# Genericize only after a second task needs it.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Worker run id whose draft-output artifact to grade'
+        required: true
+      task_id:
+        description: 'Grading table (only options1 supported in v1)'
+        required: false
+        default: 'options1'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: install rustc
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq rustc && rustc --version
+      - name: fetch artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download ${{ inputs.run_id }} -n draft-output -D graded && ls -la graded
+      - name: grade
+        run: |
+          python3 - <<'EOF'
+          import re, subprocess, os
+          assert '${{ inputs.task_id }}' == 'options1', 'grade v1 supports options1 only'
+          text = open('graded/draft-output.md', errors='replace').read()
+          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          print('FENCES: %d' % len(fences))
+          CASES = [(0,'Some(5)'),(9,'Some(5)'),(18,'Some(5)'),(22,'Some(0)'),(23,'Some(0)'),(24,'None'),(25,'None')]
+          def extract_fn(src):
+              i = src.find('fn maybe_ice_cream')
+              if i < 0: return None
+              j = src.find('{', i)
+              depth = 0
+              for k in range(j, len(src)):
+                  if src[k] == '{': depth += 1
+                  elif src[k] == '}':
+                      depth -= 1
+                      if depth == 0: return src[i:k+1]
+              return None
+          results = []
+          for n, f in enumerate(fences):
+              fn = extract_fn(f)
+              if not fn:
+                  print('FENCE %d: NO-FN' % n)
+                  results.append('NO-FN')
+                  continue
+              main = fn + '\nfn main() {\n'
+              for hour, want in CASES:
+                  main += '    if maybe_ice_cream(%d) == %s { println!("PASS %%d", %d); } else { println!("FAIL %%d got=%%s want=%s", %d, maybe_ice_cream(%d)); }\n' % (hour, want if want!='None' else 'None', hour, hour, want, hour)
+              main += '}\n'
+              open('t.rs', 'w').write(main)
+              c = subprocess.run(['rustc', '-O', 't.rs', '-o', 't'], capture_output=True, text=True)
+              if c.returncode != 0:
+                  print('FENCE %d: COMPILE-FAIL' % n)
+                  print(c.stderr[:600])
+                  results.append('COMPILE-FAIL')
+                  continue
+              r = subprocess.run(['./t'], capture_output=True, text=True)
+              print('FENCE %d: %s' % (n, r.stdout.strip().replace('\n', ' | ')))
+              results.append(r.stdout.strip())
+          fails = sum(1 for x in results if 'FAIL' in x or x in ('COMPILE-FAIL', 'NO-FN'))
+          print('GRADE: %d fences, %d with failures' % (len(fences), fails))
+          EOF
+      - name: upload grade
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grade-output
+          path: graded/draft-output.md
+          if-no-files-found: warn
