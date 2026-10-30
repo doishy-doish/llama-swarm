@@ -56,7 +56,7 @@ jobs:
                   continue
               main = fn + '\nfn main() {\n'
               for hour, want in CASES:
-                  main += '    if maybe_ice_cream(%d) == %s { println!("PASS %%d", %d); } else { println!("FAIL %%d got=%%s want=%s", %d, maybe_ice_cream(%d)); }\n' % (hour, want if want!='None' else 'None', hour, hour, want, hour)
+                  main += '    if maybe_ice_cream(' + str(hour) + ') == ' + want + ' { println!("PASS ' + str(hour) + '"); } else { println!("FAIL ' + str(hour) + '"); }\n'
               main += '}\n'
               open('t.rs', 'w').write(main)
               c = subprocess.run(['rustc', '-O', 't.rs', '-o', 't'], capture_output=True, text=True)
