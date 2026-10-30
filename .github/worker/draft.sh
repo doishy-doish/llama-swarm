@@ -1,16 +1,32 @@
 #!/bin/bash
-# Single draft worker: one task in, one artifact out. Fail-loud: any error = nonzero exit.
+# Self-hosted brain: prebuilt llama.cpp + cached GGUF on the runner. No API key.
+# One task in, one artifact out. Fail-loud.
 set -euo pipefail
 [ -n "${TASK:-}" ] || { echo "FAIL: empty task"; exit 1; }
-RESP=$(curl -sS -w "\n%{http_code}" -X POST "${ENDPOINT:-https://models.github.ai/inference/chat/completions}" \
-  -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "$(jq -n --arg t "$TASK" '{model:"openai/gpt-4o-mini", messages:[{role:"system",content:"You are a draft worker. Do exactly the task, output only the deliverable."},{role:"user",content:$t}], max_tokens:1500}')" \
-  || { echo "FAIL: inference call failed"; exit 1; })
-CODE=$(echo "$RESP" | tail -n1)
-BODY=$(echo "$RESP" | sed '$d')
-echo "DEBUG http_code=[$CODE] body_head:"; echo "$BODY" | head -c 300; echo "";
-if [ "$CODE" != "200" ]; then echo "FAIL: inference HTTP $CODE"; echo "$BODY" | head -c 500; exit 1; fi
-echo "$BODY" | jq -r '.choices[0].message.content // empty' > draft-output.md
+mkdir -p model llama-bin
+CLI="llama-bin/llama-cli"
+if [ ! -x "$CLI" ]; then
+  TAG=$(curl -sSL https://api.github.com/repos/ggml-org/llama.cpp/releases/latest | jq -r .tag_name)
+  echo "latest llama.cpp: $TAG"
+  if curl -sSL -o /tmp/lp.tgz "https://github.com/ggml-org/llama.cpp/releases/download/${TAG}/llama-${TAG}-bin-ubuntu-x64.tar.gz"; then
+    mkdir -p /tmp/lp && tar xzf /tmp/lp.tgz -C /tmp/lp
+    FOUND=$(find /tmp/lp -name llama-cli -type f | head -1)
+    [ -n "$FOUND" ] && cp "$FOUND" llama-bin/ && chmod +x llama-bin/llama-cli
+  fi
+  if [ ! -x "$CLI" ]; then
+    echo "release asset miss, building llama-cli from source..."
+    sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++ > /dev/null
+    [ -d llama.cpp ] || git clone --depth 1 https://github.com/ggml-org/llama.cpp
+    cmake -B llama.cpp/build -S llama.cpp -DCMAKE_BUILD_TYPE=Release > /dev/null
+    cmake --build llama.cpp/build -j4 --target llama-cli
+    cp llama.cpp/build/bin/llama-cli llama-bin/
+  fi
+fi
+[ -x "$CLI" ] || { echo "FAIL: no llama-cli"; exit 1; }
+MDL="model/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+[ -f "$MDL" ] || curl -sSL -o "$MDL" "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+[ -f "$MDL" ] || { echo "FAIL: no model"; exit 1; }
+echo "model bytes: $(stat -c%s "$MDL")"
+"$CLI" -m "$MDL" -p "$TASK" -n 256 -t 4 --temp 0.7 > draft-output.md 2> draft-stderr.txt || { echo "FAIL: infer rc=$?"; tail -c 800 draft-stderr.txt; exit 1; }
 [ -s draft-output.md ] || { echo "FAIL: empty draft"; exit 1; }
 echo "DRAFT OK ($(wc -c < draft-output.md) bytes)"
