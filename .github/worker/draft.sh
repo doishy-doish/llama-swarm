@@ -9,6 +9,7 @@ RESP=$(curl -sS -w "\n%{http_code}" -X POST "https://models.github.ai/inference/
   || { echo "FAIL: inference call failed"; exit 1; })
 CODE=$(echo "$RESP" | tail -n1)
 BODY=$(echo "$RESP" | sed '$d')
+echo "DEBUG http_code=[$CODE] body_head:"; echo "$BODY" | head -c 300; echo "";
 if [ "$CODE" != "200" ]; then echo "FAIL: inference HTTP $CODE"; echo "$BODY" | head -c 500; exit 1; fi
 echo "$BODY" | jq -r '.choices[0].message.content // empty' > draft-output.md
 [ -s draft-output.md ] || { echo "FAIL: empty draft"; exit 1; }
