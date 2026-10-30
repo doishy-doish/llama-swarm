@@ -48,6 +48,9 @@ jobs:
                       if depth == 0: return src[i:k+1]
               return None
           results = []
+          if not fences:
+              print('GRADE: NO_FENCE (model output contained no rust fence — attempt failed)')
+              raise SystemExit(1)
           for n, f in enumerate(fences):
               fn = extract_fn(f)
               if not fn:
