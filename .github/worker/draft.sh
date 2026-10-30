@@ -6,12 +6,15 @@ set -euo pipefail
 mkdir -p model llama-bin
 CLI="llama-bin/llama-cli"
 if [ ! -x "$CLI" ]; then
-  TAG=$(curl -sSL https://api.github.com/repos/ggml-org/llama.cpp/releases/latest | jq -r .tag_name)
-  echo "latest llama.cpp: $TAG"
-  if curl -sSL -o /tmp/lp.tgz "https://github.com/ggml-org/llama.cpp/releases/download/${TAG}/llama-${TAG}-bin-ubuntu-x64.tar.gz"; then
+  TAG=$(curl -sSL "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=30" | jq -r "[.[].tag_name | select(startswith(\"b\"))][0]")
+  echo "latest b-tag llama.cpp: $TAG"
+  ASSET="llama-${TAG}-bin-ubuntu-x64.tar.gz"
+  if curl -sSL -o /tmp/lp.tgz "https://github.com/ggml-org/llama.cpp/releases/download/${TAG}/${ASSET}" && file /tmp/lp.tgz | grep -q gzip; then
     mkdir -p /tmp/lp && tar xzf /tmp/lp.tgz -C /tmp/lp
     FOUND=$(find /tmp/lp -name llama-cli -type f | head -1)
     [ -n "$FOUND" ] && cp "$FOUND" llama-bin/ && chmod +x llama-bin/llama-cli
+  else
+    echo "WARN: release asset unusable, falling back to source build"
   fi
   if [ ! -x "$CLI" ]; then
     echo "release asset miss, building llama-cli from source..."
