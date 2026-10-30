@@ -35,17 +35,22 @@ echo "model bytes: $(stat -c%s "$MDL")"
 [ -s draft-raw.txt ] || { echo "FAIL: empty draft"; exit 1; }
 python3 - draft-raw.txt draft-output.md <<'EOF'
 import sys
-raw = open(sys.argv[1], errors='replace').read().replace('', '')
+raw = open(sys.argv[1], errors='replace').read().replace('\b', '').replace('\r', '')
 lines = raw.split('\n')
-start = 0
-for i, l in enumerate(lines):
-    if l.startswith('> '):
-        start = i + 1
 end = len(lines)
-for i in range(start, len(lines)):
-    if lines[i].startswith('[ Prompt:') or lines[i].strip() == 'Exiting...':
+for i, l in enumerate(lines):
+    if l.startswith('[ Prompt:') or l.strip() == 'Exiting...':
         end = i
         break
+start = 0
+found = False
+for i in range(end):
+    if lines[i].startswith('> ') or lines[i].strip() == '>':
+        start = i + 1
+        found = True
+if not found:
+    print('FAIL: no prompt echo found')
+    sys.exit(1)
 body = '\n'.join(lines[start:end]).strip()
 if not body:
     print('FAIL: stripped draft empty')
