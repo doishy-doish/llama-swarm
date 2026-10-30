@@ -12,7 +12,8 @@ if [ ! -x "$CLI" ]; then
   if curl -sSL -o /tmp/lp.tgz "https://github.com/ggml-org/llama.cpp/releases/download/${TAG}/${ASSET}" && file /tmp/lp.tgz | grep -q gzip; then
     mkdir -p /tmp/lp && tar xzf /tmp/lp.tgz -C /tmp/lp
     FOUND=$(find /tmp/lp -name llama-cli -type f | head -1)
-    [ -n "$FOUND" ] && cp "$FOUND" llama-bin/ && chmod +x llama-bin/llama-cli
+    if [ -n "$FOUND" ]; then BINDIR=$(dirname "$FOUND"); cp "$BINDIR"/* llama-bin/; chmod +x llama-bin/llama-cli; export LD_LIBRARY_PATH="$PWD/llama-bin:${LD_LIBRARY_PATH:-}"; fi
+export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/llama-bin:${LD_LIBRARY_PATH:-}"
   else
     echo "WARN: release asset unusable, falling back to source build"
   fi
