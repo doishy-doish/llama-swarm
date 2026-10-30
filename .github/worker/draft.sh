@@ -2,7 +2,7 @@
 # Single draft worker: one task in, one artifact out. Fail-loud: any error = nonzero exit.
 set -euo pipefail
 [ -n "${TASK:-}" ] || { echo "FAIL: empty task"; exit 1; }
-RESP=$(curl -sS -w "\n%{http_code}" -X POST "https://models.github.ai/inference/chat/completions" \
+RESP=$(curl -sS -w "\n%{http_code}" -X POST "${ENDPOINT:-https://models.github.ai/inference/chat/completions}" \
   -H "Authorization: Bearer $GH_TOKEN" \
   -H "Content-Type: application/json" \
   -d "$(jq -n --arg t "$TASK" '{model:"openai/gpt-4o-mini", messages:[{role:"system",content:"You are a draft worker. Do exactly the task, output only the deliverable."},{role:"user",content:$t}], max_tokens:1500}')" \
