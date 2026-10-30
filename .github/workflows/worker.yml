@@ -6,6 +6,14 @@ on:
         description: 'Task for the draft worker (one scoped job, one artifact out)'
         required: true
         default: 'hello-probe'
+      brain:
+        description: 'Brain script basename in .github/worker (draft or draft-qwen3)'
+        required: false
+        default: 'draft'
+      think:
+        description: 'Qwen3 thinking mode (0=/no_think direct, 1=/think reasoning; ignored by draft)'
+        required: false
+        default: '0'
 permissions:
   contents: read
 jobs:
@@ -24,12 +32,20 @@ jobs:
       - name: draft
         env:
           TASK: ${{ inputs.task }}
+          THINK: ${{ inputs.think }}
         run: |
-          chmod +x .github/worker/draft.sh
-          .github/worker/draft.sh
+          case "${{ inputs.brain }}" in
+            draft|draft-qwen3) ;;
+            *) echo "FAIL: unknown brain '${{ inputs.brain }}' (want draft or draft-qwen3)"; exit 1 ;;
+          esac
+          chmod +x .github/worker/draft.sh .github/worker/draft-qwen3.sh
+          .github/worker/${{ inputs.brain }}.sh
       - name: upload draft
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: draft-output
-          path: draft-output.md
+          path: |
+            draft-output.md
+            draft-thinking.md
+          if-no-files-found: warn
