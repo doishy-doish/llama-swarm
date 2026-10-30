@@ -31,6 +31,27 @@ MDL="model/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 [ -f "$MDL" ] || curl -sSL -o "$MDL" "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 [ -f "$MDL" ] || { echo "FAIL: no model"; exit 1; }
 echo "model bytes: $(stat -c%s "$MDL")"
-"$CLI" -m "$MDL" -p "$TASK" -n 256 -t 4 --temp 0.7 > draft-output.md 2> draft-stderr.txt || { echo "FAIL: infer rc=$?"; tail -c 800 draft-stderr.txt; exit 1; }
-[ -s draft-output.md ] || { echo "FAIL: empty draft"; exit 1; }
+"$CLI" -m "$MDL" -p "$TASK" -n 2048 -t 4 --temp 0.7 > draft-raw.txt 2> draft-stderr.txt || { echo "FAIL: infer rc=$?"; tail -c 800 draft-stderr.txt; exit 1; }
+[ -s draft-raw.txt ] || { echo "FAIL: empty draft"; exit 1; }
+python3 - draft-raw.txt draft-output.md <<'EOF'
+import sys
+raw = open(sys.argv[1], errors='replace').read().replace('', '')
+lines = raw.split('\n')
+start = 0
+for i, l in enumerate(lines):
+    if l.startswith('> '):
+        start = i + 1
+end = len(lines)
+for i in range(start, len(lines)):
+    if lines[i].startswith('[ Prompt:') or lines[i].strip() == 'Exiting...':
+        end = i
+        break
+body = '\n'.join(lines[start:end]).strip()
+if not body:
+    print('FAIL: stripped draft empty')
+    sys.exit(1)
+open(sys.argv[2], 'w').write(body + '\n')
+print('STRIP OK (%d bytes -> %d bytes)' % (len(raw), len(body)))
+EOF
+[ -s draft-output.md ] || { echo "FAIL: empty stripped draft"; exit 1; }
 echo "DRAFT OK ($(wc -c < draft-output.md) bytes)"
