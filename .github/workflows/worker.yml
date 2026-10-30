@@ -6,10 +6,6 @@ on:
         description: 'Task for the draft worker (one scoped job, one artifact out)'
         required: true
         default: 'hello-probe'
-      endpoint:
-        description: 'Inference endpoint URL (probe knob)'
-        required: false
-        default: 'https://models.github.ai/inference/chat/completions'
 permissions:
   contents: read
 jobs:
@@ -18,11 +14,6 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - name: draft
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TASK: ${{ inputs.task }}
-          ENDPOINT: ${{ inputs.endpoint }}
       - name: restore brain cache
         uses: actions/cache@v4
         with:
@@ -30,6 +21,9 @@ jobs:
             model
             llama-bin
           key: brain-qwen05b-v1
+      - name: draft
+        env:
+          TASK: ${{ inputs.task }}
         run: |
           chmod +x .github/worker/draft.sh
           .github/worker/draft.sh
