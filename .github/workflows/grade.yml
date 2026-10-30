@@ -20,12 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - uses: actions/checkout@v4
       - name: install rustc
         run: sudo apt-get update -qq && sudo apt-get install -y -qq rustc && rustc --version
       - name: fetch artifact
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download ${{ inputs.run_id }} -n draft-output -D graded && ls -la graded
+        run: gh run download ${{ inputs.run_id }} -n draft-output -R ${{ github.repository }} -D graded && ls -la graded
       - name: grade
         run: |
           python3 - <<'EOF'
