@@ -54,8 +54,17 @@ jobs:
           if not fences:
               print('FAIL: no fence in prev artifact')
               raise SystemExit(1)
-          prev = fences[-1].strip()
-          print('PREV FENCE: %d fences, last %d bytes' % (len(fences), len(prev)))
+          # first fence containing a fn item: multi-fence outputs may trail
+          # fn-less echo fences (LAB-LOG 462); last-fence blindly risks the empty one.
+          prev = None
+          for f in fences:
+              if re.search(r"\bfn\s+\w+", f):
+                  prev = f.strip()
+                  break
+          if prev is None:
+              print('FAIL: no fence with a fn item in prev artifact')
+              raise SystemExit(1)
+          print('PREV FENCE: %d fences, repairable %d bytes' % (len(fences), len(prev)))
           scope = '${{ inputs.scope }}'
           if scope == 'narrow':
               scope_line = 'SCOPE: Change ONLY the mappings named above. Do not touch anything else.'
@@ -77,11 +86,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          DISPATCH_T=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           gh workflow run worker.yml -R ${{ github.repository }} \
             -F task=prompt.txt -f brain='${{ inputs.brain }}' -f think='${{ inputs.think }}'
-          sleep 20
-          echo "NEW_RUN_ID=$(gh run list -R ${{ github.repository }} --workflow=worker.yml --limit=1 --json databaseId --jq '.[0].databaseId')" >> "$GITHUB_ENV"
-          echo "watching $NEW_RUN_ID"
+          NEW_RUN_ID=""
+          for i in $(seq 1 30); do
+            sleep 20
+            NEW_RUN_ID=$(gh run list -R ${{ github.repository }} --workflow=worker --limit=5 \
+              --json databaseId,createdAt --jq "[.[] | select(.createdAt > \"$DISPATCH_T\")] | .[0].databaseId // empty")
+            if [ -n "$NEW_RUN_ID" ]; then break; fi
+          done
+          if [ -z "$NEW_RUN_ID" ]; then echo "FAIL: no worker run materialized after dispatch"; exit 1; fi
+          echo "NEW_RUN_ID=$NEW_RUN_ID" >> "$GITHUB_ENV"
+          echo "watching $NEW_RUN_ID (serial-only: no concurrent repair runs in v1)"
       - name: watch and fetch
         env:
           GH_TOKEN: ${{ github.token }}
