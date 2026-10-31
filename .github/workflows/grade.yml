@@ -51,6 +51,10 @@ jobs:
           if not fences:
               print('GRADE: NO_FENCE (model output contained no rust fence — attempt failed)')
               raise SystemExit(1)
+          gradeable = sum(1 for f in fences if extract_fn(f))
+          if not gradeable:
+              print('GRADE: NO-GRADEABLE-FENCE (fences present but none contains a fn item — nothing to grade, attempt failed)')
+              raise SystemExit(1)
           for n, f in enumerate(fences):
               fn = extract_fn(f)
               if not fn:
