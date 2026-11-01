@@ -1,8 +1,7 @@
 name: probe-output
-# Trial probe v2: exfiltrates draft-output SHAPE via STATIC artifact names
-# (expression-in-name failed; static names + if-conditions are the proven pattern).
-# Emits up to three artifacts per run, e.g.: shape-nf0 + shape-nbm + shape-main0
-# (NF=fence count bucket 0/1/2p, NB=byte bucket s<400/m<800/l>=800, MAIN=has-fn-main).
+# Trial probe v3: adds TICK and LANG buckets (fence-variant diagnosis).
+# Emits static-named artifacts, e.g.: shape-nf0 + shape-nbm + shape-main0 + lang-none + ticks-no
+# (TICKS: any ``` line at all; LANG: language tag on first fence line — rust/other/none).
 on:
   workflow_dispatch:
     inputs:
@@ -32,11 +31,17 @@ jobs:
           nb = len(raw.encode('utf-8'))
           nb_buk = "nbs" if nb < 400 else ("nbm" if nb < 800 else "nbl")
           main = "main1" if re.search(r"\bfn\s+main\b", raw) else "main0"
+          ticklines = [l for l in raw.split("\n") if l.strip().startswith("```")]
+          ticks = "ticksyes" if ticklines else "ticksno"
+          lang = "langnone"
+          if ticklines:
+              tag = ticklines[0].strip()[3:].strip().lower()
+              lang = "langrust" if tag == "rust" else "langother"
           envf = open(os.environ["GITHUB_ENV"], "a")
-          envf.write("NFBUK=" + nf_buk + "\nNBBUK=" + nb_buk + "\nMAIN=" + main + "\nNB=" + str(nb) + "\n")
+          envf.write("NFBUK=" + nf_buk + "\nNBBUK=" + nb_buk + "\nMAIN=" + main + "\nTICKS=" + ticks + "\nLANG=" + lang + "\n")
           envf.close()
-          open("marker.txt", "w").write("nf=%d nb=%d main=%s\n" % (nf, nb, main))
-          print("nf=%d nb=%d main=%s" % (nf, nb, main))
+          open("marker.txt", "w").write("nf=%d nb=%d main=%s ticks=%s lang=%s\nticklines=%s\n" % (nf, nb, main, ticks, lang, ticklines[:4]))
+          print(open("marker.txt").read())
           EOF
           cat marker.txt
       - name: shape nf0
@@ -71,3 +76,23 @@ jobs:
         if: env.MAIN == 'main1'
         uses: actions/upload-artifact@v4
         with: {name: shape-main1, path: marker.txt, if-no-files-found: error}
+      - name: lang rust
+        if: env.LANG == 'langrust'
+        uses: actions/upload-artifact@v4
+        with: {name: lang-rust, path: marker.txt, if-no-files-found: error}
+      - name: lang other
+        if: env.LANG == 'langother'
+        uses: actions/upload-artifact@v4
+        with: {name: lang-other, path: marker.txt, if-no-files-found: error}
+      - name: lang none
+        if: env.LANG == 'langnone'
+        uses: actions/upload-artifact@v4
+        with: {name: lang-none, path: marker.txt, if-no-files-found: error}
+      - name: ticks yes
+        if: env.TICKS == 'ticksyes'
+        uses: actions/upload-artifact@v4
+        with: {name: ticks-yes, path: marker.txt, if-no-files-found: error}
+      - name: ticks no
+        if: env.TICKS == 'ticksno'
+        uses: actions/upload-artifact@v4
+        with: {name: ticks-no, path: marker.txt, if-no-files-found: error}
