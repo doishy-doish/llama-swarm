@@ -31,7 +31,8 @@ MDL="model/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 [ -f "$MDL" ] || curl -sSL -o "$MDL" "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 [ -f "$MDL" ] || { echo "FAIL: no model"; exit 1; }
 echo "model bytes: $(stat -c%s "$MDL")"
-"$CLI" -m "$MDL" -p "$TASK" -n 2048 -t 4 --temp 0.7 > draft-raw.txt 2> draft-stderr.txt || { echo "FAIL: infer rc=$?"; tail -c 800 draft-stderr.txt; exit 1; }
+if [ -f "$TASK" ]; then PROMPT="$(cat "$TASK")"; else PROMPT="$TASK"; fi
+"$CLI" -m "$MDL" -p "$PROMPT" -n 2048 -t 4 --temp 0.7 > draft-raw.txt 2> draft-stderr.txt || { echo "FAIL: infer rc=$?"; tail -c 800 draft-stderr.txt; exit 1; }
 [ -s draft-raw.txt ] || { echo "FAIL: empty draft"; exit 1; }
 python3 - draft-raw.txt draft-output.md <<'EOF'
 import sys
