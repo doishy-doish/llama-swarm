@@ -27,7 +27,17 @@ jobs:
           python3 - <<'EOF'
           import os, re, subprocess
           text = open('graded/draft-output.md', errors='replace').read()
-          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          fences = []
+          cur = None
+          for line in text.splitlines():
+              s = line.strip()
+              if s.startswith("```rust"):
+                  cur = []
+              elif s == "```" and cur is not None:
+                  fences.append("\n".join(cur))
+                  cur = None
+              elif cur is not None:
+                  cur.append(line)
           cand = [f for f in fences if re.search(r"\bfn\s+maybe_ice_cream\b", f)]
           fn = cand[0] if cand else None
           CASES = [(0, 'Some(5)'), (9, 'Some(5)'), (18, 'Some(5)'),
