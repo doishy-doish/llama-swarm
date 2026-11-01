@@ -52,7 +52,17 @@ jobs:
           python3 - <<'EOF'
           import re
           text = open('prev/draft-output.md', errors='replace').read()
-          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          fences = []
+          cur = None
+          for line in text.splitlines():
+              ln = line.strip()
+              if ln.startswith("```rust"):
+                  cur = []
+              elif ln == "```" and cur is not None:
+                  fences.append("\n".join(cur))
+                  cur = None
+              elif cur is not None:
+                  cur.append(line)
           if not fences:
               print('FAIL: no fence in prev artifact')
               raise SystemExit(1)
@@ -60,7 +70,7 @@ jobs:
           # fn-less echo fences (LAB-LOG 462); last-fence blindly risks the empty one.
           prev = None
           for f in fences:
-              if re.search(r"\bfn\s+\w+", f):
+              if re.search(r"\bfn\s+\w+[^\n{]*\{", f):
                   prev = f.strip()
                   break
           if prev is None:
@@ -116,11 +126,21 @@ jobs:
           python3 - <<'EOF'
           import re, os
           text = open('new/draft-output.md', errors='replace').read()
-          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          fences = []
+          cur = None
+          for line in text.splitlines():
+              ln = line.strip()
+              if ln.startswith("```rust"):
+                  cur = []
+              elif ln == "```" and cur is not None:
+                  fences.append("\n".join(cur))
+                  cur = None
+              elif cur is not None:
+                  cur.append(line)
           print('NEW FENCES: %d' % len(fences))
           repairable = None
           for f in fences:
-              if re.search(r"\bfn\s+\w+", f):
+              if re.search(r"\bfn\s+\w+[^\n{]*\{", f):
                   repairable = f.strip()
                   break
           if repairable is None:
