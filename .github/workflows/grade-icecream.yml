@@ -46,7 +46,7 @@ jobs:
           cand = [f for f in fences if re.search(r"\bfn\s+\w+[^\n{]*\{", f)]
           if cand:
               mains = [f for f in cand if re.search(r"\bfn\s+main\b[^\n{]*\{", f)]
-              undefined
+              fences = [(mains[-1] if mains else cand[-1])]
               print("MULTI-FENCE: %d fences, grading first fn-fence" % len(re.findall(r"```rust", text)))
           WANT = ["HOUR 0 => Some(5)", "HOUR 9 => Some(5)", "HOUR 18 => Some(5)",
                   "HOUR 22 => Some(0)", "HOUR 23 => Some(0)", "HOUR 24 => None", "HOUR 25 => None"]
