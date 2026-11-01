@@ -29,13 +29,23 @@ jobs:
           python3 - <<'EOF'
           import os, re, subprocess
           text = open('graded/draft-output.md', errors='replace').read()
-          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          fences = []
+          cur = None
+          for line in text.splitlines():
+              s = line.strip()
+              if s.startswith("```rust"):
+                  cur = []
+              elif s == "```" and cur is not None:
+                  fences.append("\n".join(cur))
+                  cur = None
+              elif cur is not None:
+                  cur.append(line)
           # Doctrine (repair v2, LAB-LOG 462/464): multi-fence echo outputs are the
           # norm for small brains — grade the FIRST fence containing a fn item
           # (preferring one with fn main), not the exactly-1 gate.
-          cand = [f for f in fences if re.search(r"\bfn\s+\w+", f)]
+          cand = [f for f in fences if re.search(r"\bfn\s+\w+[^\n{]*\{", f)]
           if cand:
-              mains = [f for f in cand if re.search(r"\bfn\s+main\b", f)]
+              mains = [f for f in cand if re.search(r"\bfn\s+main\b[^\n{]*\{", f)]
               fences = [(mains[0] if mains else cand[0])]
               print("MULTI-FENCE: %d fences, grading first fn-fence" % len(re.findall(r"```rust", text)))
           WANT = ["HOUR 0 => Some(5)", "HOUR 9 => Some(5)", "HOUR 18 => Some(5)",
