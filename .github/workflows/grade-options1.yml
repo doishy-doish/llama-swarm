@@ -58,6 +58,10 @@ jobs:
           print("VERDICT=" + verdict + " fails=" + str(fails)[:300])
           open(os.environ["GITHUB_ENV"], "a").write("VERDICT=" + verdict + "\n")
           open("verdict-opt-" + verdict, "w").write(verdict + "\n" + "\n".join(fails) + "\n")
+          hours = [0, 9, 18, 22, 23, 24, 25]
+          for h in hours:
+              hit = "1" if any(f.startswith("FAIL %d" % h) for f in fails) else "0"
+              open(os.environ["GITHUB_ENV"], "a").write("FAIL%02d=%s\n" % (h, hit))
           EOF
       - name: upload verdict PASS
         if: env.VERDICT == 'PASS'
@@ -67,3 +71,31 @@ jobs:
         if: env.VERDICT == 'FAIL'
         uses: actions/upload-artifact@v4
         with: {name: verdict-opt-FAIL, path: verdict-opt-FAIL, if-no-files-found: error}
+      - name: failcase 00
+        if: env.FAIL00 == '1'
+        uses: actions/upload-artifact@v4
+        with: {name: failcase-00, path: verdict-opt-FAIL, if-no-files-found: error}
+      - name: failcase 09
+        if: env.FAIL09 == '1'
+        uses: actions/upload-artifact@v4
+        with: {name: failcase-09, path: verdict-opt-FAIL, if-no-files-found: error}
+      - name: failcase 18
+        if: env.FAIL18 == '1'
+        uses: actions/upload-artifact@v4
+        with: {name: failcase-18, path: verdict-opt-FAIL, if-no-files-found: error}
+      - name: failcase 22
+        if: env.FAIL22 == '1'
+        uses: actions/upload-artifact@v4
+        with: {name: failcase-22, path: verdict-opt-FAIL, if-no-files-found: error}
+      - name: failcase 23
+        if: env.FAIL23 == '1'
+        uses: actions/upload-artifact@v4
+        with: {name: failcase-23, path: verdict-opt-FAIL, if-no-files-found: error}
+      - name: failcase 24
+        if: env.FAIL24 == '1'
+        uses: actions/upload-artifact@v4
+        with: {name: failcase-24, path: verdict-opt-FAIL, if-no-files-found: error}
+      - name: failcase 25
+        if: env.FAIL25 == '1'
+        uses: actions/upload-artifact@v4
+        with: {name: failcase-25, path: verdict-opt-FAIL, if-no-files-found: error}
