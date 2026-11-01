@@ -1,0 +1,69 @@
+name: grade-options1
+# Trial oracle for the maybe_ice_cream FUNCTION task (options1 table, machine-executed).
+# Verdict encoded in artifact NAME: verdict-opt-PASS (7/7) / verdict-opt-FAIL (else, incl NOFENCE/COMPILE-FAIL).
+# Always exits 0. Mirrors grade.yml CASES + first-fn-fence doctrine.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Worker run id whose draft-output artifact to grade'
+        required: true
+permissions:
+  actions: read
+  contents: read
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: install rustc
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq rustc && rustc --version
+      - name: fetch artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download ${{ inputs.run_id }} -n draft-output -R ${{ github.repository }} -D graded && ls -la graded
+      - name: decide verdict
+        run: |
+          python3 - <<'EOF'
+          import os, re, subprocess
+          text = open('graded/draft-output.md', errors='replace').read()
+          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          cand = [f for f in fences if re.search(r"\bfn\s+maybe_ice_cream\b", f)]
+          fn = cand[0] if cand else None
+          CASES = [(0, 'Some(5)'), (9, 'Some(5)'), (18, 'Some(5)'),
+                   (22, 'Some(0)'), (23, 'Some(0)'), (24, 'None'), (25, 'None')]
+          fails = []
+          if fn is None:
+              fails = ["NO-FN-FENCE"]
+              print("NO-FN-FENCE (fences=%d)" % len(fences))
+          else:
+              main = fn.strip() + "\nfn main() {\n"
+              for hour, want in CASES:
+                  main += '    if maybe_ice_cream(' + str(hour) + ') == ' + want + ' { println!("PASS ' + str(hour) + '"); } else { println!("FAIL ' + str(hour) + '"); }\n'
+              main += "}\n"
+              open('t.rs', 'w').write(main)
+              c = subprocess.run(['rustc', '-O', 't.rs', '-o', 't'], capture_output=True, text=True)
+              if c.returncode != 0:
+                  fails = ["COMPILE-FAIL"]
+                  print("COMPILE-FAIL:")
+                  print(c.stderr[:800])
+              else:
+                  r = subprocess.run(['./t'], capture_output=True, text=True)
+                  out = r.stdout.strip()
+                  print(out.replace("\n", " | "))
+                  for line in out.split("\n"):
+                      if line.startswith("FAIL"):
+                          fails.append(line)
+          verdict = "PASS" if not fails else "FAIL"
+          print("VERDICT=" + verdict + " fails=" + str(fails)[:300])
+          open(os.environ["GITHUB_ENV"], "a").write("VERDICT=" + verdict + "\n")
+          open("verdict-opt-" + verdict, "w").write(verdict + "\n" + "\n".join(fails) + "\n")
+          EOF
+      - name: upload verdict PASS
+        if: env.VERDICT == 'PASS'
+        uses: actions/upload-artifact@v4
+        with: {name: verdict-opt-PASS, path: verdict-opt-PASS, if-no-files-found: error}
+      - name: upload verdict FAIL
+        if: env.VERDICT == 'FAIL'
+        uses: actions/upload-artifact@v4
+        with: {name: verdict-opt-FAIL, path: verdict-opt-FAIL, if-no-files-found: error}
