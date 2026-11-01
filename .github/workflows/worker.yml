@@ -7,7 +7,7 @@ on:
         required: true
         default: 'hello-probe'
       brain:
-        description: 'Brain script basename in .github/worker (draft or draft-qwen3)'
+        description: 'Brain script basename in .github/worker (draft, draft-qwen3, draft-hf)'
         required: false
         default: 'draft'
       think:
@@ -54,10 +54,10 @@ jobs:
           MODEL_DIR: ${{ inputs.modeldir }}
         run: |
           case "${{ inputs.brain }}" in
-            draft|draft-qwen3) ;;
-            *) echo "FAIL: unknown brain '${{ inputs.brain }}' (want draft or draft-qwen3)"; exit 1 ;;
+            draft|draft-qwen3|draft-hf) ;;
+            *) echo "FAIL: unknown brain '${{ inputs.brain }}' (want draft, draft-qwen3 or draft-hf)"; exit 1 ;;
           esac
-          chmod +x .github/worker/draft.sh .github/worker/draft-qwen3.sh
+          chmod +x .github/worker/draft.sh .github/worker/draft-qwen3.sh .github/worker/draft-hf.sh
           .github/worker/${{ inputs.brain }}.sh
       - name: upload draft
         if: always()
