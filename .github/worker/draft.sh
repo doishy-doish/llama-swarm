@@ -3,7 +3,7 @@
 # One task in, one artifact out. Fail-loud.
 set -euo pipefail
 [ -n "${TASK:-}" ] || { echo "FAIL: empty task"; exit 1; }
-mkdir -p model llama-bin
+mkdir -p "${MODEL_DIR:-model}" llama-bin
 CLI="llama-bin/llama-cli"
 if [ ! -x "$CLI" ]; then
   TAG=$(curl -sSL "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=30" | jq -r "[.[].tag_name | select(startswith(\"b\"))][0]")
@@ -27,8 +27,9 @@ export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/llama-bin:${LD_LIBRARY_PATH:-}"
   fi
 fi
 [ -x "$CLI" ] || { echo "FAIL: no llama-cli"; exit 1; }
-MDL="model/qwen2.5-0.5b-instruct-q4_k_m.gguf"
-[ -f "$MDL" ] || curl -sSL -o "$MDL" "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+MURL="${MODEL_URL:-https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf}"
+MDL="${MODEL_DIR:-model}/$(basename "$MURL")"
+[ -f "$MDL" ] || curl -sSL -o "$MDL" "$MURL"
 [ -f "$MDL" ] || { echo "FAIL: no model"; exit 1; }
 echo "model bytes: $(stat -c%s "$MDL")"
 if [ -f "$TASK" ]; then PROMPT="$(cat "$TASK")"; else PROMPT="$TASK"; fi
