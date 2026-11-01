@@ -1,5 +1,6 @@
 name: grade-icecream
 # Trial oracle for task-2 (icecream-table): exact-stdout grade, machine-executed.
+# v2 doctrine: first fence with fn item (multi-fence echo is normal for small brains).
 # Verdict is encoded in the uploaded artifact NAME (verdict-PASS / verdict-NOFENCE /
 # verdict-COMPILE-FAIL / verdict-MISMATCH) so it is readable via the artifacts LIST API.
 # Detail stays in logs. Always exits 0 (conclusion carries nothing; the name carries the verdict).
@@ -29,12 +30,20 @@ jobs:
           import os, re, subprocess
           text = open('graded/draft-output.md', errors='replace').read()
           fences = re.findall(r"```rust(.*?)```", text, re.S)
+          # Doctrine (repair v2, LAB-LOG 462/464): multi-fence echo outputs are the
+          # norm for small brains — grade the FIRST fence containing a fn item
+          # (preferring one with fn main), not the exactly-1 gate.
+          cand = [f for f in fences if re.search(r"\bfn\s+\w+", f)]
+          if cand:
+              mains = [f for f in cand if re.search(r"\bfn\s+main\b", f)]
+              fences = [(mains[0] if mains else cand[0])]
+              print("MULTI-FENCE: %d fences, grading first fn-fence" % len(re.findall(r"```rust", text)))
           WANT = ["HOUR 0 => Some(5)", "HOUR 9 => Some(5)", "HOUR 18 => Some(5)",
                   "HOUR 22 => Some(0)", "HOUR 23 => Some(0)", "HOUR 24 => None", "HOUR 25 => None"]
           verdict = None
           if len(fences) != 1:
               verdict = "NOFENCE"
-              print("FENCES: %d (want exactly 1)" % len(fences))
+              print("FENCES: %d (0 fenced blocks, or no fence with a fn item)" % len(fences))
           else:
               open('prog.rs', 'w').write(fences[0].strip() + "\n")
               c = subprocess.run(['rustc', '-O', 'prog.rs', '-o', 'prog'], capture_output=True, text=True)
