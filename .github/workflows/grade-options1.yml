@@ -39,7 +39,7 @@ jobs:
               elif cur is not None:
                   cur.append(line)
           cand = [f for f in fences if re.search(r"\bfn\s+maybe_ice_cream\b", f)]
-          undefined
+          fn = cand[-1] if cand else None
           CASES = [(0, 'Some(5)'), (9, 'Some(5)'), (18, 'Some(5)'),
                    (22, 'Some(0)'), (23, 'Some(0)'), (24, 'None'), (25, 'None')]
           fails = []
