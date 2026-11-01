@@ -1,0 +1,92 @@
+name: grade-icecream
+# Trial oracle for task-2 (icecream-table): exact-stdout grade, machine-executed.
+# Verdict is encoded in the uploaded artifact NAME (verdict-PASS / verdict-NOFENCE /
+# verdict-COMPILE-FAIL / verdict-MISMATCH) so it is readable via the artifacts LIST API.
+# Detail stays in logs. Always exits 0 (conclusion carries nothing; the name carries the verdict).
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Worker run id whose draft-output artifact to grade'
+        required: true
+permissions:
+  actions: read
+  contents: read
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: install rustc
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq rustc && rustc --version
+      - name: fetch artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download ${{ inputs.run_id }} -n draft-output -R ${{ github.repository }} -D graded && ls -la graded
+      - name: decide verdict
+        run: |
+          python3 - <<'EOF'
+          import os, re, subprocess
+          text = open('graded/draft-output.md', errors='replace').read()
+          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          WANT = ["HOUR 0 => Some(5)", "HOUR 9 => Some(5)", "HOUR 18 => Some(5)",
+                  "HOUR 22 => Some(0)", "HOUR 23 => Some(0)", "HOUR 24 => None", "HOUR 25 => None"]
+          verdict = None
+          if len(fences) != 1:
+              verdict = "NOFENCE"
+              print("FENCES: %d (want exactly 1)" % len(fences))
+          else:
+              open('prog.rs', 'w').write(fences[0].strip() + "\n")
+              c = subprocess.run(['rustc', '-O', 'prog.rs', '-o', 'prog'], capture_output=True, text=True)
+              if c.returncode != 0:
+                  verdict = "COMPILE-FAIL"
+                  print("COMPILE-FAIL:")
+                  print(c.stderr[:800])
+              else:
+                  r = subprocess.run(['./prog'], capture_output=True, text=True)
+                  got = r.stdout.strip().split("\n")
+                  print("GOT %d lines:" % len(got))
+                  for line in got:
+                      print("  " + line)
+                  if got == WANT:
+                      verdict = "PASS"
+                  else:
+                      verdict = "MISMATCH"
+                      print("WANT %d lines; first diff:" % len(WANT))
+                      for a, b in zip(got, WANT):
+                          if a != b:
+                              print("  got=[" + a + "] want=[" + b + "]")
+                              break
+          print("VERDICT=" + verdict)
+          open(os.environ["GITHUB_ENV"], "a").write("VERDICT=" + verdict + "\n")
+          open("verdict-" + verdict, "w").write(verdict + "\n")
+          EOF
+          ls -la verdict-*
+      - name: upload verdict PASS
+        if: env.VERDICT == 'PASS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdict-PASS
+          path: verdict-PASS
+          if-no-files-found: error
+      - name: upload verdict NOFENCE
+        if: env.VERDICT == 'NOFENCE'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdict-NOFENCE
+          path: verdict-NOFENCE
+          if-no-files-found: error
+      - name: upload verdict COMPILE-FAIL
+        if: env.VERDICT == 'COMPILE-FAIL'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdict-COMPILE-FAIL
+          path: verdict-COMPILE-FAIL
+          if-no-files-found: error
+      - name: upload verdict MISMATCH
+        if: env.VERDICT == 'MISMATCH'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verdict-MISMATCH
+          path: verdict-MISMATCH
+          if-no-files-found: error
