@@ -1,0 +1,57 @@
+name: probe-output
+# Trial probe: exfiltrates draft-output SHAPE via the artifact NAME (readable via list API).
+# Name form: probe-nf{N}-nb{BYTES}-main{M}-think{T}-head{HEAD40}
+# (NF=fence count, NB=answer bytes, MAIN=has-fn-main, THINK=thinking bytes, HEAD=sanitized first 40 chars)
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Worker run id whose draft-output artifact to probe'
+        required: true
+permissions:
+  actions: read
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: fetch artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download ${{ inputs.run_id }} -n draft-output -R ${{ github.repository }} -D probed && ls -la probed
+      - name: compute shape
+        run: |
+          python3 - <<'EOF'
+          import os, re
+          raw = open('probed/draft-output.md', errors='replace').read()
+          think = ""
+          try:
+              think = open('probed/draft-thinking.md', errors='replace').read()
+          except Exception:
+              pass
+          fences = re.findall(r"```rust(.*?)```", raw, re.S)
+          nf = len(fences)
+          nb = len(raw.encode('utf-8'))
+          tb = len(think.encode('utf-8'))
+          hasmain = 1 if re.search(r"\bfn\s+main\b", raw) else 0
+          first = ""
+          for line in raw.split("\n"):
+              s = line.strip().strip('`').strip()
+              if s and not s.startswith('>') and not s.startswith('[') and 'Prompt:' not in s:
+                  first = s
+                  break
+          head = re.sub(r"[^A-Za-z0-9_+\-.,:;!?()\[\] ]", "", first)[:40].strip().replace(" ", "_")
+          if not head:
+              head = "EMPTY"
+          name = "probe-nf%d-nb%d-main%d-think%d-head-%s" % (nf, nb, hasmain, tb, head)
+          print("NAME=" + name)
+          open(os.environ["GITHUB_ENV"], "a").write("PROBENAME=" + name + "\n")
+          open("marker.txt", "w").write(name + "\n")
+          EOF
+      - name: upload probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROBENAME }}
+          path: marker.txt
+          if-no-files-found: error
