@@ -84,13 +84,19 @@ jobs:
           print('PROMPT: %d bytes' % len(prompt))
           EOF
           ls -la prompt.txt
+      - name: serial guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          N=$(gh run list -R ${{ github.repository }} --workflow=repair --status=in_progress --json databaseId --jq length)
+          if [ "$N" -gt 1 ]; then echo "FAIL: another repair in_progress (serial-only), abort"; exit 1; fi
       - name: dispatch worker
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           DISPATCH_T=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           gh workflow run worker.yml -R ${{ github.repository }} \
-            -F task=prompt.txt -f brain='${{ inputs.brain }}' -f think='${{ inputs.think }}'
+            -F task="$(cat prompt.txt)" -f brain='${{ inputs.brain }}' -f think='${{ inputs.think }}'
           NEW_RUN_ID=""
           for i in $(seq 1 30); do
             sleep 20
