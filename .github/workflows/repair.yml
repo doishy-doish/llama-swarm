@@ -27,7 +27,7 @@ on:
       think:
         description: 'Qwen3 thinking mode (0=/no_think, 1=/think)'
         required: false
-        default: '0'
+        default: '1'
       auto_grade:
         description: 'Dispatch grade.yml on the new run (options1 only)'
         required: false
@@ -72,7 +72,6 @@ jobs:
           for f in fences:
               if re.search(r"\bfn\s+\w+[^\n{]*\{", f):
                   prev = f.strip()
-                  break
           if prev is None:
               print('FAIL: no fence with a fn item in prev artifact')
               raise SystemExit(1)
@@ -142,7 +141,6 @@ jobs:
           for f in fences:
               if re.search(r"\bfn\s+\w+[^\n{]*\{", f):
                   repairable = f.strip()
-                  break
           if repairable is None:
               print('FAIL: no fence with a fn item in new artifact')
               raise SystemExit(1)
