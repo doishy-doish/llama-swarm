@@ -53,11 +53,13 @@ MDL="model/qwen3-0.6b-q8_0.gguf"
 echo "model bytes: $(stat -c%s "$MDL")"
 # THINK=0 (default): /no_think direct-answer mode, same 2048 budget as draft.sh.
 # THINK=1: /think reasoning mode, 4096 budget (thinking eats tokens first).
+TASK_TEXT="$TASK"
+if [ -f "$TASK" ]; then TASK_TEXT="$(cat "$TASK")"; fi  # STAGED FIX: file-or-literal (repair passes filename)
 if [ "${THINK:-0}" = "1" ]; then
-  PROMPT="$TASK /think"
+  PROMPT="$TASK_TEXT /think"
   TEMP="0.6"; TOPP="0.95"; TOPK="20"; NTOK="4096"
 else
-  PROMPT="$TASK /no_think"
+  PROMPT="$TASK_TEXT /no_think"
   TEMP="0.7"; TOPP="0.8"; TOPK="20"; NTOK="2048"
 fi
 "$CLI" -m "$MDL" -p "$PROMPT" -n "$NTOK" -t 4 --temp "$TEMP" --top-p "$TOPP" --top-k "$TOPK" > draft-raw.txt 2> draft-stderr.txt || { echo "FAIL: infer rc=$?"; tail -c 800 draft-stderr.txt; exit 1; }
