@@ -33,7 +33,17 @@ jobs:
           import re, subprocess, os
           assert '${{ inputs.task_id }}' == 'options1', 'grade v1 supports options1 only'
           text = open('graded/draft-output.md', errors='replace').read()
-          fences = re.findall(r"```rust(.*?)```", text, re.S)
+          fences = []
+          cur = None
+          for line in text.splitlines():
+              s = line.strip()
+              if s.startswith("```rust"):
+                  cur = []
+              elif s == "```" and cur is not None:
+                  fences.append("\n".join(cur))
+                  cur = None
+              elif cur is not None:
+                  cur.append(line)
           print('FENCES: %d' % len(fences))
           CASES = [(0,'Some(5)'),(9,'Some(5)'),(18,'Some(5)'),(22,'Some(0)'),(23,'Some(0)'),(24,'None'),(25,'None')]
           def extract_fn(src):
