@@ -30,6 +30,8 @@ fi
 MURL="${MODEL_URL:-https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf}"
 MDL="${MODEL_DIR:-model}/$(basename "$MURL")"
 [ -f "$MDL" ] || curl -sSL -o "$MDL" "$MURL"
+SZ=$(stat -c%s "$MDL" 2>/dev/null || echo 0)
+[ "$SZ" -gt 100000000 ] || { echo "FAIL: model file too small (${SZ}B) - bad URL or 404 page. head:"; head -c 200 "$MDL"; echo; exit 1; }
 [ -f "$MDL" ] || { echo "FAIL: no model"; exit 1; }
 echo "model bytes: $(stat -c%s "$MDL")"
 if [ -f "$TASK" ]; then PROMPT="$(cat "$TASK")"; else PROMPT="$TASK"; fi
