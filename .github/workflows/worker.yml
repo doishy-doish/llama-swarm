@@ -14,6 +14,10 @@ on:
         description: 'Qwen3 thinking mode (0=/no_think direct, 1=/think reasoning; ignored by draft)'
         required: false
         default: '0'
+      temp:
+        description: 'Sampling temperature for llama-cli (default 0.7 preserves current behavior)'
+        required: false
+        default: '0.7'
 permissions:
   contents: read
 jobs:
@@ -33,6 +37,7 @@ jobs:
         env:
           TASK: ${{ inputs.task }}
           THINK: ${{ inputs.think }}
+          TEMP: ${{ inputs.temp }}
         run: |
           case "${{ inputs.brain }}" in
             draft|draft-qwen3) ;;
