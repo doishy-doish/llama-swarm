@@ -2,7 +2,7 @@ name: repair
 # Closed repair loop v2: prev artifact -> first fence with a fn item -> templated prompt ->
 # worker dispatch -> watch -> new fence -> optional machine grade.
 # Never pastes raw output back (echo doctrine, LAB-LOG 459): the repairable unit
-# is the FIRST fence containing a fn item; context is rebuilt from inputs, not echoed.
+# is the LAST fence containing a fn-brace item (the prompt quotes prev code in a fence, so FIRST would re-grab prev); context rebuilt from inputs, not echoed.
 # v2 (LAB-LOG 462, 464): multi-fence outputs may trail fn-less echo fences, so
 # last-fence-blindly risks grabbing an empty fence (vacuous-green class #3).
 # v1 races: new-run lookup takes the newest worker run (no concurrent dispatches
@@ -66,8 +66,8 @@ jobs:
           if not fences:
               print('FAIL: no fence in prev artifact')
               raise SystemExit(1)
-          # first fence containing a fn item: multi-fence outputs may trail
-          # fn-less echo fences (LAB-LOG 462); last-fence blindly risks the empty one.
+          # last fence containing a fn-brace item: the repair prompt quotes prev code
+          # in a fence, so first-fence would re-grab prev (Iter48); empties never match.
           prev = None
           for f in fences:
               if re.search(r"\bfn\s+\w+[^\n{]*\{", f):
